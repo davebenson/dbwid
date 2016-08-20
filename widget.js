@@ -13,7 +13,7 @@ function shallowCopyOrNull(array) {
 }
 
 class DbwidWidget {
-  constructor() {
+  constructor(frame) {
     this._layoutManager = null;
     this._parentLayoutInfo = null;   // reserved for parent's layout manager
     this._children = [];
@@ -21,15 +21,23 @@ class DbwidWidget {
     this._parts = [];
     this._drawing = false;
     this._layingOut = false;
+    this._frame = frame === undefined ? DbwidRect.zero : frame;
+    this._bounds = frame === undefined ? DbwidRect.zero : new DbwidRect(0,0,frame.width,frame.height);
   }
-  get layoutManager() {
-    return this._layoutManager;
+  addLayoutFunc(func) {
+    this._layoutFuncs.push(func);
   }
-  set layoutManager(lm) {
-    this._layoutManager = lm;
-    this.setNeedsLayout();
+  removeLayoutFunc(func) {
+    this._layoutFuncs.remove(func);
   }
-
+  layoutChildAlign(child, childCoord, parentCoord) {
+    const f = () => {
+      child._frame = child._frame.alignXY(childCoord.x, childCoord.y, this._bounds, parentCoord.x, parentCoord.y);
+    };
+    this.addLayoutFunc(f);
+    return f;
+  }
+  layoutChildrenBox(children, direction, 
   // --- Public methods ---
   // These must not be called during "draw" or "layout" virtual methods.
   addChild(w) {
@@ -63,7 +71,7 @@ class DbwidWidget {
     this._removeAtIndex(idx);
   }
 
-  // --- Functions for use by the layout manager ---
+  // --- Functions for use by the layout methods ---
   layoutChild(w, frame) {
     if (!this._layingOut) {
       logger.error('layoutChild must only be called during layout()');
@@ -120,10 +128,6 @@ class DbwidWidget {
     this._layingOut = true;
     this._layingOutParentCalled = false;
 
-    // handle layout hints 
-    for (let i = 0; i < this._children.length; i++)
-      this._children[i].remainingLayoutHints = shallowCopyOrNull(
-
     // all subclasses must eventually call super()
     this.layoutChildren();
 
@@ -134,15 +138,6 @@ class DbwidWidget {
   layoutChildren() {
     assert(this._layingOut);
     assert(!this._layingOutParentCalled);
-
-    // hints
-    this.handleBaseLayoutHints();
-    
-    for (let i = 0; i < this._children.length; i++) {
-      if (this._children[i].remainingLayoutHints.length !== 0) {
-        logger.warning(...);
-      }
-    }
 
     this._layingOutParentCalled = true;
   }
